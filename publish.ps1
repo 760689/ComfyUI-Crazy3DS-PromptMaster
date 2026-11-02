@@ -1,20 +1,25 @@
-# 一键发布脚本：把当前目录推送到 GitHub
+# One-click publish helper: push this folder to GitHub.
 #
-# 用法（在仓库根目录执行）：
-#   1) 先设置令牌（二选一）
-#        $env:GITHUB_TOKEN = "ghp_xxxxxxxx"        # 或者写到本目录的 _token.txt（已被 .gitignore 忽略）
-#   2) 仓库已在网页建好：
-#        .\publish.ps1 -Repo "https://github.com/<你的账号>/ComfyUI-Crazy3DS-PromptMaster.git"
-#      仓库还没建（脚本会自动建一个 Private 仓库）：
-#        .\publish.ps1 -Repo "https://github.com/<你的账号>/ComfyUI-Crazy3DS-PromptMaster.git" -NewRepo
-#      想公开就再加 -Public
+# Usage (run inside the repo root):
+#   1) provide a token (either way)
+#        $env:GITHUB_TOKEN = "ghp_xxxxxxxx"
+#        or write it into _token.txt next to this script (already git-ignored)
+#   2) push to an existing empty repo:
+#        .\publish.ps1 -Repo "https://github.com/<account>/ComfyUI-Crazy3DS-PromptMaster.git"
+#      or let the script create the repo first (private by default):
+#        .\publish.ps1 -Repo "https://github.com/<account>/ComfyUI-Crazy3DS-PromptMaster.git" -NewRepo
+#      add -Public to create a public repo instead.
 #
-# 参数：
-#   -Repo      目标仓库地址（HTTPS）
-#   -Branch    分支名，默认 main
-#   -Message   提交信息，默认 "release: v69"
-#   -NewRepo   远端不存在时用 GitHub API 自动创建
-#   -Public    配合 -NewRepo，创建公开仓库（默认 Private）
+# Params:
+#   -Repo     target repo URL (HTTPS)
+#   -Branch   branch name, default main
+#   -Message  commit message, default "release: v69"
+#   -NewRepo  create the repo via GitHub API when it does not exist yet
+#   -Public   with -NewRepo: create a public repo (default private)
+#
+# NOTE: keep every string in this file ASCII. Windows PowerShell 5.1 reads
+#       BOM-less .ps1 files as ANSI, which turns non-ASCII text into mojibake
+#       before it ever reaches git.
 
 param(
     [Parameter(Mandatory = $true)][string]$Repo,
@@ -26,77 +31,70 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# ---- 解析 git（优先用随包下载的 MinGit，本机没有全局 git）----
+# Use the bundled MinGit when the machine has no global git (downloaded next to this repo).
 $git = "git"
 $bundled = Join-Path (Split-Path $PSScriptRoot -Parent) "_tools\mingit\cmd\git.exe"
 if (Test-Path $bundled) { $git = $bundled }
-Write-Host "使用 git: $git"
+Write-Host "git: $git"
 & $git --version | Out-Host
 
-# ---- 解析令牌 ----
 $token = $env:GITHUB_TOKEN
 if (-not $token -and (Test-Path "$PSScriptRoot\_token.txt")) {
     $token = (Get-Content "$PSScriptRoot\_token.txt" -Raw).Trim()
 }
 if (-not $token -and -not $NewRepo) {
-    Write-Warning "未检测到 GITHUB_TOKEN：将尝试用系统已保存的凭据推送（可能被要求输入账号密码）。"
+    Write-Warning "No GITHUB_TOKEN found. Falling back to stored git credentials."
 }
 
-# ---- 解析 账号/仓库名 ----
 if ($Repo -notmatch "github\.com[:/]+([^/]+)/([^/]+?)(\.git)?$") {
-    throw "无法从 -Repo 解析出 账号/仓库名：$Repo"
+    throw "Cannot parse owner/repo from -Repo: $Repo"
 }
 $owner = $Matches[1]
 $name = $Matches[2]
 
-# ---- 可选：自动创建仓库 ----
 if ($NewRepo) {
-    if (-not $token) { throw "-NewRepo 需要 GITHUB_TOKEN" }
+    if (-not $token) { throw "-NewRepo requires GITHUB_TOKEN" }
     $body = @{
         name        = $name
         private     = (-not $Public)
-        description = "Crazy3DS 美女提示词大师 — ComfyUI 商业人像级提示词节点"
+        description = "Crazy3DS PromptMaster - ComfyUI portrait prompt node"
     } | ConvertTo-Json
-    Write-Host "创建仓库 $owner/$name ..."
+    Write-Host "creating repo $owner/$name ..."
     Invoke-RestMethod -Method Post -Uri "https://api.github.com/user/repos" `
         -Headers @{ Authorization = "token $token"; "User-Agent" = "c3ds-publish" } `
-        -Body $body -ContentType "application/json" | Out-Null
+        -Body ([Text.Encoding]::UTF8.GetBytes($body)) `
+        -ContentType "application/json; charset=utf-8" | Out-Null
 }
 
-# ---- 初始化 / 提交 ----
 if (-not (Test-Path ".git")) {
     & $git init -b $Branch
     & $git config core.autocrlf false
     & $git config core.quotepath false
 }
-$hasUser = (& $git config user.email)
-if (-not $hasUser) {
+if (-not (& $git config user.email)) {
     & $git config user.name "Crazy3DS"
     & $git config user.email "crazy3ds@users.noreply.github.com"
 }
+
 & $git add -A
 $staged = (& $git diff --cached --name-only | Measure-Object).Count
 if ($staged -gt 0) {
     & $git commit -m $Message
 } else {
-    Write-Host "没有需要提交的改动。"
+    Write-Host "nothing to commit"
 }
 
-# ---- 远端与推送 ----
 $pushUrl = $Repo
-if ($token) {
-    $pushUrl = $Repo -replace "^https://", "https://x-access-token:$token@"
-}
+if ($token) { $pushUrl = $Repo -replace "^https://", "https://x-access-token:$token@" }
 & $git remote remove origin 2>$null
 & $git remote add origin $pushUrl
-Write-Host "推送 $owner/$name ($Branch) ..."
+Write-Host "pushing $owner/$name ($Branch) ..."
 & $git push -u origin $Branch
-& $git remote set-url origin $Repo   # 推完立刻移除 URL 里的令牌
+& $git remote set-url origin $Repo   # drop the token from .git/config right after push
 
-# ---- 打标签（v69）----
 & $git tag -f v69
 & $git push -f origin v69
 
 Write-Host ""
-Write-Host "完成：https://github.com/$owner/$name"
-Write-Host "下一步（可选）：在 GitHub Releases 页面用 v69 标签发布，附件可上传 ComfyUI-Crazy3DS-PromptMaster-v69.zip"
+Write-Host "done: https://github.com/$owner/$name"
+Write-Host "next (optional): publish a GitHub Release for tag v69 and attach ComfyUI-Crazy3DS-PromptMaster-v69.zip"
