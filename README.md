@@ -8,6 +8,8 @@
 ![comfyui](https://img.shields.io/badge/ComfyUI-custom%20node-purple)
 
 > 它不拼随机词。它把**摄影师的工作流**写进提示词：先决定「这一批锁什么、变什么」，再决定「谁、穿什么、在哪、怎么拍」。
+>
+> **适用流程：文生图（txt2img）** —— 节点只产出提示词文本，不加载模型，接在 KSampler 的 positive / negative 上即可。
 
 ![节点面板（ComfyUI 实机截图）](docs/screenshot-panel.png)
 
@@ -138,6 +140,19 @@ git clone https://github.com/GITHUB_USER/ComfyUI-Crazy3DS-PromptMaster.git
 ## 六、使用
 
 节点分类：`Crazy3DS/提示词大师` → **Crazy3DS 美女提示词大师 v69**
+
+### 适用工作流：文生图（txt2img）
+
+本节点是**纯文本节点**，不加载模型、不做采样，因此只面向 **文生图** 流程。仓库**不附带示例工作流 JSON**，接线就三行：
+
+1. `提示词` → `CLIP Text Encode`（positive）的 `text`
+2. `负面提示词` → 另一个 `CLIP Text Encode`（negative）的 `text`
+3. 两个 `CONDITIONING` + `Empty Latent Image` → `KSampler` → `VAE Decode` → `Save Image`
+
+- 「数量」= 4 时 `提示词` 输出的是**长度为 4 的列表**；ComfyUI 会按列表逐条执行，出图张数与列表长度一致。
+- 只想先看文本不跑图：接 `Show Text`（comfyui-custom-scripts）即可，见上图右侧。
+- `负面提示词` / `段信息` 是单值输出，直接连对应节点，不需要展开。
+
 
 | 输出 | 类型 | 说明 |
 |---|---|---|
