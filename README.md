@@ -9,7 +9,7 @@
 
 > 它不拼随机词。它把**摄影师的工作流**写进提示词：先决定「这一批锁什么、变什么」，再决定「谁、穿什么、在哪、怎么拍」。
 
-![界面示意](docs/ui-panel.png)
+![节点面板（ComfyUI 实机截图）](docs/screenshot-panel.png)
 
 > ⚠️ **内容提示**：本节点含成人向（NSFW）词库与无衣模式，仅限 18 岁以上用户自行负责使用；建议仓库以 Private 方式托管。
 
@@ -102,7 +102,7 @@
 
 ## 四、相机滤镜与强度
 
-![相机滤镜菜单](docs/ui-filter-menu.png)
+![相机滤镜下拉（自绘组件示意图：悬停态不便截图，按真实参数绘制）](docs/ui-filter-menu.png)
 
 | 强度 | 提示词构成 |
 |---|---|
@@ -144,6 +144,10 @@ git clone https://github.com/GITHUB_USER/ComfyUI-Crazy3DS-PromptMaster.git
 | `提示词` | STRING（列表） | 纯净列表，可直接连 CLIP Text Encode |
 | `负面提示词` | STRING | 按当前参数组合生成，同参数可复现 |
 | `段信息` | STRING | 每行标注 模式/段号/场景/姿势/景别/机位 |
+
+![节点与 Show Text 输出](docs/screenshot-output.png)
+
+> 上图右侧是接 `comfyui-custom-scripts` 的 Show Text：左边面板一次出 4 条，右边能看到「模特换装」模式下**人物锁定、服装/场景/姿势/机位在变**的实际效果。
 
 ### 参数
 
